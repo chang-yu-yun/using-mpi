@@ -4,7 +4,7 @@
 #include <string.h>
 #include <mpi.h>
 
-#define MIN(a, b)  ((a) <= (b) ? (a) : (b))
+#define MIN(a, b)  (a) <= (b) ? (a) : (b)
 
 void print_mat(double* mat, int rows, int cols)
 {
@@ -56,6 +56,7 @@ int main(int argc, char* argv[])
         fill_mat(mat, rows, cols);
         fill_mat(vec, cols, 1);
         memset(res, 0, sizeof(double) * rows);
+
         // broadcast vector
         MPI_Bcast(vec, cols, MPI_DOUBLE, manager, MPI_COMM_WORLD);
 
@@ -64,6 +65,7 @@ int main(int argc, char* argv[])
             MPI_Send(mat + count*cols, cols, MPI_DOUBLE, i+1, count+1, MPI_COMM_WORLD);
             count++;
         }
+
         // receive multiplication results
         for (int i = 0; i < rows; i++) {
             MPI_Recv(&ans, 1, MPI_DOUBLE, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
@@ -77,6 +79,8 @@ int main(int argc, char* argv[])
                 MPI_Send(MPI_BOTTOM, 0, MPI_DOUBLE, sender, 0, MPI_COMM_WORLD);
             }
         }
+
+        // print matrix, vector and multiplication result
         printf("Matrix A:\n");
         print_mat(mat, rows, cols);
         printf("\nVector b:\n");
@@ -87,22 +91,31 @@ int main(int argc, char* argv[])
         free(vec);
         free(res);
     } else {
+        // memory allocation
         double* row = (double*)malloc(sizeof(double) * cols);
         double* vec = (double*)malloc(sizeof(double) * cols);
         int row_idx;
         double res;
         MPI_Status status;
 
+        // receive vector from manager
         MPI_Bcast(vec, cols, MPI_DOUBLE, manager, MPI_COMM_WORLD);
+
+        // this rank has task
         if (irank <= rows) {
             for (;;) {
+                // receive one row of matrix from manager
                 MPI_Recv(row, cols, MPI_DOUBLE, manager, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
                 row_idx = status.MPI_TAG;
+
+                // no work required to handle
                 if (row_idx == 0) break;
                 res = 0.0;
                 for (int i = 0; i < cols; i++) {
                     res = res + row[i] * vec[i];
                 }
+
+                // send product result back to manager
                 MPI_Send(&res, 1, MPI_DOUBLE, manager, row_idx, MPI_COMM_WORLD);
             }
         }
